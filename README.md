@@ -19,4 +19,4 @@ Each folder is self-contained — open its `README.md` for setup and usage
 instructions specific to that task.
 
 ## 👤 Author
-Fares — Null Pointer Academy | SOC Analyst (Tier 2)
+Fares Adel | SOC Analyst (Tier 2)
