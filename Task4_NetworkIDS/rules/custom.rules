@@ -1,0 +1,97 @@
+# =============================================================================
+# custom.rules
+# CodeAlpha Cyber Security Internship - Task 4: Network Intrusion Detection
+# Author: Fares
+#
+# Custom Suricata detection rules covering common attack patterns:
+# reconnaissance (port scans), brute force, web application attacks (SQLi,
+# XSS attempts), and denial-of-service style floods.
+#
+# SID ranges: using the 1,000,000+ range reserved for local/custom rules
+# so these never collide with official Emerging Threats / ET Open rule IDs.
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# RECONNAISSANCE
+# ---------------------------------------------------------------------------
+
+# Detect a classic TCP port scan: many SYN packets to different ports from
+# one source in a short window (Suricata's built-in flow tracking via
+# `detection_filter` approximates a simple threshold-based scan detector).
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Possible TCP Port Scan Detected"; \
+    flags:S; detection_filter:track by_src, count 20, seconds 10; \
+    classtype:attempted-recon; sid:1000001; rev:1;)
+
+# Detect NULL scan (no flags set) - a common stealth scanning technique
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM NULL Scan Detected"; \
+    flags:0; classtype:attempted-recon; sid:1000002; rev:1;)
+
+# Detect XMAS scan (FIN, PSH, URG flags all set) - another stealth scan
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM XMAS Scan Detected"; \
+    flags:FPU; classtype:attempted-recon; sid:1000003; rev:1;)
+
+# ---------------------------------------------------------------------------
+# BRUTE FORCE
+# ---------------------------------------------------------------------------
+
+# Flag repeated SSH connection attempts from the same source - a hallmark
+# of credential brute-forcing.
+alert tcp any any -> $HOME_NET 22 (msg:"CUSTOM Possible SSH Brute Force Attempt"; \
+    flow:to_server; flags:S; detection_filter:track by_src, count 10, seconds 30; \
+    classtype:attempted-admin; sid:1000010; rev:1;)
+
+# Flag repeated HTTP 401/403 style login attempts (looks for repeated POSTs
+# to a login-shaped path from the same source in a short window).
+alert http any any -> $HOME_NET any (msg:"CUSTOM Possible HTTP Login Brute Force"; \
+    http.method; content:"POST"; http.uri; content:"login"; nocase; \
+    detection_filter:track by_src, count 8, seconds 20; \
+    classtype:attempted-admin; sid:1000011; rev:1;)
+
+# ---------------------------------------------------------------------------
+# WEB APPLICATION ATTACKS
+# ---------------------------------------------------------------------------
+
+# Detect common SQL injection payload fragments in HTTP request URIs
+alert http any any -> $HOME_NET any (msg:"CUSTOM Possible SQL Injection Attempt in URI"; \
+    http.uri; content:"UNION"; nocase; pcre:"/UNION.*SELECT/i"; \
+    classtype:web-application-attack; sid:1000020; rev:1;)
+
+alert http any any -> $HOME_NET any (msg:"CUSTOM Possible SQLi - OR 1=1 Pattern"; \
+    http.uri; content:"OR 1=1"; nocase; \
+    classtype:web-application-attack; sid:1000021; rev:1;)
+
+# Detect basic reflected XSS payload fragments in HTTP request URIs
+alert http any any -> $HOME_NET any (msg:"CUSTOM Possible XSS Attempt in URI"; \
+    http.uri; content:"<script"; nocase; \
+    classtype:web-application-attack; sid:1000022; rev:1;)
+
+# Detect obvious path traversal attempts
+alert http any any -> $HOME_NET any (msg:"CUSTOM Possible Path Traversal Attempt"; \
+    http.uri; content:"../../"; \
+    classtype:web-application-attack; sid:1000023; rev:1;)
+
+# ---------------------------------------------------------------------------
+# DENIAL OF SERVICE / FLOODS
+# ---------------------------------------------------------------------------
+
+# Detect a high rate of ICMP echo requests from a single source (ping flood)
+alert icmp any any -> $HOME_NET any (msg:"CUSTOM Possible ICMP Flood (Ping Flood)"; \
+    itype:8; detection_filter:track by_src, count 50, seconds 10; \
+    classtype:attempted-dos; sid:1000030; rev:1;)
+
+# Detect a high rate of SYN packets to a single destination port (SYN flood)
+alert tcp any any -> $HOME_NET any (msg:"CUSTOM Possible SYN Flood"; \
+    flags:S; detection_filter:track by_dst, count 100, seconds 10; \
+    classtype:attempted-dos; sid:1000031; rev:1;)
+
+# ---------------------------------------------------------------------------
+# SUSPICIOUS TOOLING / RECON USER AGENTS
+# ---------------------------------------------------------------------------
+
+alert http any any -> $HOME_NET any (msg:"CUSTOM Suspicious Scanner User-Agent (sqlmap)"; \
+    http.user_agent; content:"sqlmap"; nocase; \
+    classtype:attempted-recon; sid:1000040; rev:1;)
+
+alert http any any -> $HOME_NET any (msg:"CUSTOM Suspicious Scanner User-Agent (nikto)"; \
+    http.user_agent; content:"Nikto"; nocase; \
+    classtype:attempted-recon; sid:1000041; rev:1;)

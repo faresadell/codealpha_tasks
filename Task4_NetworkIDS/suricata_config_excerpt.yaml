@@ -1,0 +1,55 @@
+# =============================================================================
+# suricata.yaml (relevant excerpt)
+# CodeAlpha Cyber Security Internship - Task 4: Network Intrusion Detection
+#
+# This is NOT a full suricata.yaml (that file is huge and ships with the
+# package). This shows the specific sections that were changed from
+# defaults to wire up this project: the home network definition, where
+# custom rules are loaded from, and enabling the EVE JSON alert log that
+# alert_responder.py and the dashboard both consume.
+#
+# Merge these values into your system's /etc/suricata/suricata.yaml.
+# =============================================================================
+
+vars:
+  address-groups:
+    # Replace with your actual protected network range.
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+
+default-rule-path: /etc/suricata/rules
+
+rule-files:
+  # Official community ruleset (installed separately via `suricata-update`)
+  - suricata.rules
+  # This project's custom detection logic
+  - custom.rules
+
+af-packet:
+  - interface: eth0          # <-- change to your monitored interface
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: eve.json
+      types:
+        - alert:
+            payload: yes
+            payload-printable: yes
+            packet: yes
+            http-body: yes
+            tagged-packets: yes
+        - http:
+            extended: yes
+        - dns:
+            enabled: yes
+        - flow:
+            enabled: yes
+
+  - stats:
+      enabled: yes
+      interval: 30

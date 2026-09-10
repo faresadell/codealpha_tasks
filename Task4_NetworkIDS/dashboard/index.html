@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IDS Alert Dashboard — CodeAlpha</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0D1117;
+    --panel: #151B23;
+    --panel-2: #1B2330;
+    --text: #E6EDF3;
+    --text-dim: #8B949E;
+    --border: #2B3440;
+    --safe: #3FB68B;
+    --warn: #E3B341;
+    --danger: #F0555A;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .mono { font-family: "SF Mono", Consolas, "Courier New", monospace; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header { margin-bottom: 32px; }
+  .eyebrow { color: var(--warn); font-size: 13px; margin-bottom: 8px; }
+  h1 { font-family: Georgia, serif; font-size: 30px; margin: 0 0 6px; color: #fff; }
+  header p { color: var(--text-dim); margin: 0; font-size: 15px; }
+
+  .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+  @media (max-width: 800px) { .cards { grid-template-columns: 1fr 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px; }
+  .card .num { font-family: Georgia, serif; font-size: 30px; }
+  .card .lbl { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .card.high .num { color: var(--danger); }
+  .card.blocked .num { color: var(--warn); }
+
+  .charts { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; margin-bottom: 28px; }
+  @media (max-width: 800px) { .charts { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .panel h2 { font-size: 15px; margin: 0 0 16px; color: #fff; font-weight: 600; }
+  .panel canvas { max-height: 240px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--panel-2); }
+  .sev { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+  .sev.HIGH { background: rgba(240,85,90,0.15); color: var(--danger); }
+  .sev.MEDIUM { background: rgba(227,179,65,0.15); color: var(--warn); }
+  .sev.LOW { background: rgba(63,182,139,0.15); color: var(--safe); }
+
+  .data-loader { margin-top: 32px; }
+  .data-loader summary { cursor: pointer; color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+  textarea { width: 100%; height: 120px; background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; }
+  .btn { margin-top: 10px; padding: 8px 16px; background: var(--warn); border: none; border-radius: 6px; color: #1a1400; font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow mono">CodeAlpha · Cyber Security Internship · Task 4</div>
+    <h1>Network IDS — Alert Dashboard</h1>
+    <p>Live visualization of Suricata alert data from <span class="mono">eve.json</span> / <span class="mono">incidents.log</span>.</p>
+  </header>
+
+  <div class="cards">
+    <div class="card"><div class="num" id="stat-total">0</div><div class="lbl">Total alerts</div></div>
+    <div class="card high"><div class="num" id="stat-high">0</div><div class="lbl">High severity</div></div>
+    <div class="card"><div class="num" id="stat-ips">0</div><div class="lbl">Unique source IPs</div></div>
+    <div class="card blocked"><div class="num" id="stat-blocked">0</div><div class="lbl">Auto-blocked (≥3 alerts)</div></div>
+  </div>
+
+  <div class="charts">
+    <div class="panel">
+      <h2>Top Source IPs by Alert Count</h2>
+      <canvas id="ipChart"></canvas>
+    </div>
+    <div class="panel">
+      <h2>Alerts by Severity</h2>
+      <canvas id="sevChart"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Alert Timeline</h2>
+    <canvas id="timeChart"></canvas>
+  </div>
+
+  <div class="panel" style="margin-top:16px;">
+    <h2>Recent Alerts</h2>
+    <table>
+      <thead><tr><th>Time</th><th>Severity</th><th>Source IP</th><th>Destination</th><th>Signature</th></tr></thead>
+      <tbody id="alert-table"></tbody>
+    </table>
+  </div>
+
+  <details class="data-loader">
+    <summary>Load your own incidents.log data (paste JSON lines, one alert per line)</summary>
+    <textarea id="data-input" placeholder='{"time": "...", "src_ip": "...", "dest_ip": "...", "signature": "...", "severity": "HIGH"}'></textarea>
+    <br>
+    <button class="btn" onclick="loadCustomData()">Render Dashboard</button>
+  </details>
+</div>
+
+<script>
+  // Sample data mirrors scripts/sample_eve.json + the auto-block it triggers,
+  // so the dashboard is meaningful to look at without any setup.
+  const sampleAlerts = [
+    {time:"2026-09-08T10:00:01+00:00", src_ip:"203.0.113.55", dest_ip:"192.168.1.10", signature:"CUSTOM Possible SSH Brute Force Attempt", severity:"MEDIUM"},
+    {time:"2026-09-08T10:00:04+00:00", src_ip:"203.0.113.55", dest_ip:"192.168.1.10", signature:"CUSTOM Possible SSH Brute Force Attempt", severity:"MEDIUM"},
+    {time:"2026-09-08T10:00:07+00:00", src_ip:"203.0.113.55", dest_ip:"192.168.1.10", signature:"CUSTOM Possible SSH Brute Force Attempt", severity:"MEDIUM"},
+    {time:"2026-09-08T10:01:15+00:00", src_ip:"198.51.100.23", dest_ip:"192.168.1.20", signature:"CUSTOM Possible SQL Injection Attempt in URI", severity:"HIGH"},
+    {time:"2026-09-08T10:01:16+00:00", src_ip:"198.51.100.23", dest_ip:"192.168.1.20", signature:"CUSTOM Suspicious Scanner User-Agent (sqlmap)", severity:"MEDIUM"},
+    {time:"2026-09-08T10:02:30+00:00", src_ip:"192.0.2.77", dest_ip:"192.168.1.30", signature:"CUSTOM Possible TCP Port Scan Detected", severity:"MEDIUM"},
+    {time:"2026-09-08T10:03:00+00:00", src_ip:"198.51.100.23", dest_ip:"192.168.1.20", signature:"CUSTOM Possible XSS Attempt in URI", severity:"MEDIUM"},
+    {time:"2026-09-08T10:04:45+00:00", src_ip:"203.0.113.99", dest_ip:"192.168.1.10", signature:"CUSTOM Possible ICMP Flood (Ping Flood)", severity:"MEDIUM"}
+  ];
+
+  let ipChart, sevChart, timeChart;
+
+  function render(alerts) {
+    const total = alerts.length;
+    const high = alerts.filter(a => a.severity === "HIGH").length;
+    const ipCounts = {};
+    alerts.forEach(a => { ipCounts[a.src_ip] = (ipCounts[a.src_ip] || 0) + 1; });
+    const uniqueIps = Object.keys(ipCounts).length;
+    const blocked = Object.values(ipCounts).filter(c => c >= 3).length;
+
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-high').textContent = high;
+    document.getElementById('stat-ips').textContent = uniqueIps;
+    document.getElementById('stat-blocked').textContent = blocked;
+
+    // Top IPs chart
+    const topIps = Object.entries(ipCounts).sort((a,b) => b[1]-a[1]).slice(0,6);
+    if (ipChart) ipChart.destroy();
+    ipChart = new Chart(document.getElementById('ipChart'), {
+      type: 'bar',
+      data: {
+        labels: topIps.map(x => x[0]),
+        datasets: [{ data: topIps.map(x => x[1]), backgroundColor: '#E3B341' }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { color: '#8B949E' } }, x: { ticks: { color: '#8B949E' } } } }
+    });
+
+    // Severity chart
+    const sevCounts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+    alerts.forEach(a => { sevCounts[a.severity] = (sevCounts[a.severity] || 0) + 1; });
+    if (sevChart) sevChart.destroy();
+    sevChart = new Chart(document.getElementById('sevChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['High', 'Medium', 'Low'],
+        datasets: [{ data: [sevCounts.HIGH, sevCounts.MEDIUM, sevCounts.LOW], backgroundColor: ['#F0555A', '#E3B341', '#3FB68B'] }]
+      },
+      options: { plugins: { legend: { labels: { color: '#E6EDF3' } } } }
+    });
+
+    // Timeline chart
+    const sorted = [...alerts].sort((a,b) => new Date(a.time) - new Date(b.time));
+    if (timeChart) timeChart.destroy();
+    timeChart = new Chart(document.getElementById('timeChart'), {
+      type: 'line',
+      data: {
+        labels: sorted.map(a => new Date(a.time).toLocaleTimeString()),
+        datasets: [{ label: 'Alerts', data: sorted.map((_, i) => i + 1), borderColor: '#E3B341', backgroundColor: 'rgba(227,179,65,0.15)', fill: true, tension: 0.2 }]
+      },
+      options: { plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#8B949E' } }, x: { ticks: { color: '#8B949E' } } } }
+    });
+
+    // Table
+    const tbody = document.getElementById('alert-table');
+    tbody.innerHTML = sorted.slice().reverse().map(a => `
+      <tr>
+        <td class="mono">${new Date(a.time).toLocaleString()}</td>
+        <td><span class="sev ${a.severity}">${a.severity}</span></td>
+        <td class="mono">${a.src_ip}</td>
+        <td class="mono">${a.dest_ip}</td>
+        <td>${a.signature}</td>
+      </tr>
+    `).join('');
+  }
+
+  function loadCustomData() {
+    const raw = document.getElementById('data-input').value.trim();
+    if (!raw) return;
+    const alerts = raw.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+      try { return JSON.parse(l); } catch { return null; }
+    }).filter(Boolean);
+    if (alerts.length) render(alerts);
+  }
+
+  render(sampleAlerts);
+</script>
+</body>
+</html>
