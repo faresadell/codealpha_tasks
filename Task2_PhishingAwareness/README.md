@@ -31,4 +31,4 @@ To host it publicly (for the LinkedIn video / submission link):
 - How to translate awareness content into an interactive format that reinforces learning through practice, not just reading
 
 ## 👤 Author
-Fares — Null Pointer Academy | SOC Analyst (Tier 2)
+Fares Adel | SOC Analyst (Tier 2)
