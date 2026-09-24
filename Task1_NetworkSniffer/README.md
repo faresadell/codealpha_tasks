@@ -78,4 +78,4 @@ networks you own or have explicit authorization to monitor. Capturing
 traffic on networks without permission may be illegal.
 
 ## 👤 Author
-Fares — Null Pointer Academy | SOC Analyst (Tier 2)
+Fares Adel | SOC Analyst (Tier 2)
