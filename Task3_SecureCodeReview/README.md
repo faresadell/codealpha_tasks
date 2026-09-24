@@ -54,4 +54,4 @@ bandit -r app_after/      # 0 issues found
 purposes only. Do not deploy it.
 
 ## 👤 Author
-Fares — Null Pointer Academy | SOC Analyst (Tier 2)
+Fares Adel | SOC Analyst (Tier 2)
