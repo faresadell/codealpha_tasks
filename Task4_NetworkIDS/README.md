@@ -121,4 +121,4 @@ monitor. `alert_responder.py --enforce` modifies live firewall rules —
 test in dry-run mode first.
 
 ## 👤 Author
-Fares — Null Pointer Academy | SOC Analyst (Tier 2)
+Fares Adel| SOC Analyst (Tier 2)
